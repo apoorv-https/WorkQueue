@@ -3,13 +3,15 @@ Worker Service — worker.py
 - Uses concurrent.futures.ThreadPoolExecutor for concurrency
 - Polls Redis with BRPOP (blocking pop from right)
 - Retries failed tasks up to the configured limit
-- Exposes GET /metrics via FastAPI
+- Exposes GET /health and GET /metrics via FastAPI
+- Worker threads start via FastAPI lifespan (works with uvicorn)
 """
 
 import json
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 
 import redis
 import uvicorn
@@ -33,7 +35,25 @@ _lock       = threading.Lock()
 jobs_done   = 0
 jobs_failed = 0
 
-app = FastAPI(title="WorkQueue Worker")
+# ── Lifespan: starts worker threads when uvicorn launches ────────────────
+_executor = ThreadPoolExecutor(max_workers=NUM_WORKERS)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start worker threads on startup."""
+    for i in range(NUM_WORKERS):
+        _executor.submit(run_worker, i)
+    print(f"[WorkQueue] {NUM_WORKERS} workers running")
+    yield
+    _executor.shutdown(wait=False)
+
+app = FastAPI(title="WorkQueue Worker", lifespan=lifespan)
+
+
+@app.get("/health")
+def health():
+    """Keep-alive endpoint — also used by Render health checks."""
+    return {"status": "ok"}
 
 
 @app.get("/metrics")
@@ -91,10 +111,5 @@ def run_worker(worker_id: int) -> None:
 
 
 if __name__ == "__main__":
-    # Launch worker threads via ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as pool:
-        for i in range(NUM_WORKERS):
-            pool.submit(run_worker, i)
-
-        print(f"[WorkQueue] {NUM_WORKERS} workers running | metrics → http://localhost:{PORT}/metrics")
-        uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="warning")
+    # Local dev: uvicorn will trigger lifespan automatically
+    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="warning")

@@ -12,15 +12,16 @@ services:
       - key: PORT_PRODUCER
         value: 8080
 
-  # ── Worker (Background Worker — no public URL, just processes queue) ───────
-  - type: worker
+  # ── Worker (Web Service to stay on Free Tier — no credit card needed) ───────
+  - type: web
     name: workqueue-worker
+    plan: free
     runtime: python
     rootDir: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python worker.py
+    startCommand: uvicorn worker:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: REDIS_URL
-        sync: false          # same value as producer — set in dashboard
+        sync: false
       - key: PORT_WORKER
         value: 8081
