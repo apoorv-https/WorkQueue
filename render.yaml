@@ -1,0 +1,26 @@
+services:
+  # ── Producer (Web Service — exposes /enqueue and /health) ─────────────────
+  - type: web
+    name: workqueue-producer
+    runtime: python
+    rootDir: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn producer:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: REDIS_URL
+        sync: false          # set manually in Render dashboard (keeps secret safe)
+      - key: PORT_PRODUCER
+        value: 8080
+
+  # ── Worker (Background Worker — no public URL, just processes queue) ───────
+  - type: worker
+    name: workqueue-worker
+    runtime: python
+    rootDir: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python worker.py
+    envVars:
+      - key: REDIS_URL
+        sync: false          # same value as producer — set in dashboard
+      - key: PORT_WORKER
+        value: 8081
