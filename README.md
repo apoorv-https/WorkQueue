@@ -1,6 +1,6 @@
 # WorkQueue
 
-A Distributed Background Task Processing System — originally written in Go, now also available as a **Python implementation** using FastAPI and Upstash Redis (no Docker required).
+A Distributed Background Task Processing System — Written in Python using FastAPI and Upstash Redis (no Docker required).
 
 **High level overview**
 ![overview](WorkQueue.png)
